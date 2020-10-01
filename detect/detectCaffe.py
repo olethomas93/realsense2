@@ -44,7 +44,7 @@ def detect_people(frame, net):
 
         # filter out weak detections by ensuring the `confidence` is
         # greater than the minimum confidence
-        if confidence > float(0.75):
+        if confidence > float(0.8):
 
             classID = int(detections[0, 0, i, 1])  # class label
 
