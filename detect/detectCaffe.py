@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+from detect import config_caffe as config
 
 
 def detect_people(frame, net):
@@ -44,7 +45,7 @@ def detect_people(frame, net):
 
         # filter out weak detections by ensuring the `confidence` is
         # greater than the minimum confidence
-        if confidence > float(0.8):
+        if confidence > float(config.MIN_CONF):
 
             classID = int(detections[0, 0, i, 1])  # class label
 

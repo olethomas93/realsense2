@@ -10,6 +10,11 @@ import os
 import imutils
 import json
 import math
+import threading
+import pickle
+import socket
+import logging
+import struct
 
 
 def predict_bbox_mp(image_queue, predicted_data):
@@ -130,6 +135,65 @@ def Show_Image_mp(processed_image, original_image):
                 break
 
 
+class ClientThread(threading.Thread):
+
+    def __init__(self, clientAddress, clientsocket, stream):
+        threading.Thread.__init__(self)
+        self.csocket = clientsocket
+        self.clientAddress = clientAddress
+        self.stream = stream
+        self.lock = threading.Lock()
+        self.frame = stream.get()
+
+        print("New connection added: ", clientAddress)
+        self.stopped = False
+
+    def run(self):
+        encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 90]
+        print("Connection from : ", self.clientAddress)
+
+        while not self.stopped:
+
+            self.lock.acquire()
+
+            try:
+                if not self.stream.empty():
+                    print("send")
+                    self.frame = self.stream.get()
+
+                    a = pickle.dumps(self.frame, 0)
+                    message = struct.pack("Q", len(a))+a
+                    self.csocket.sendall(message)
+            except AssertionError as e:
+                print(e)
+            finally:
+                logging.debug('Released a lock')
+
+                self.lock.release()
+
+        cam.release()
+        print("Client at ", self.clientAddress, " disconnected...")
+
+
+def socketVideoStream(host, port, processed_frames):
+
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    # server = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
+    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    server.bind((host, port))
+    lock = threading.Lock()
+
+    print("Server started")
+    print("Waiting for client request..")
+    while True:
+        server.listen(5)
+        clientsocket, clientAddress = server.accept()
+        newthread = ClientThread(clientAddress, clientsocket, processed_frames)
+
+        newthread.start()
+    server.close()
+
+
 def get3d(x, y, frames):
 
     align_to = rs.stream.color
@@ -172,9 +236,13 @@ def detect_video_realtime_mp():
     p3 = Process(target=Show_Image_mp, args=(
         processed_frames, original_frames))
 
+    p4 = Process(target=socketVideoStream, args=(
+        "10.0.0.36", 8080, processed_frames))
+
     p1.start()
     p2.start()
     p3.start()
+    p4.start()
 
     while True:
 
