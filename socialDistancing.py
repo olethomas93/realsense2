@@ -19,7 +19,7 @@ import struct
 
 def predict_bbox_mp(image_queue, predicted_data):
 
-    # load the COCO class labels our YOLO model was trained on
+    # load the class labels the  model was trained on
     labelsPath = os.path.sep.join([config.MODEL_PATH, "caffe.names"])
     LABELS = open(labelsPath).read().strip().split("\n")
     # derive the paths to the YOLO weights and model configuration
@@ -123,6 +123,7 @@ def postprocess_mp(bboxes, original_frames, processed_frames):
 def Show_Image_mp(processed_image, original_image):
 
     print('show image thread')
+
     while True:
 
         if not processed_image.empty():
@@ -164,7 +165,7 @@ class ClientThread(threading.Thread):
                     a = pickle.dumps(self.frame, 0)
                     message = struct.pack("Q", len(a))+a
                     self.csocket.sendall(message)
-            except AssertionError as e:
+            except Exception as e:
                 print(e)
             finally:
                 logging.debug('Released a lock')
@@ -175,6 +176,9 @@ class ClientThread(threading.Thread):
         print("Client at ", self.clientAddress, " disconnected...")
 
 
+
+#starts a tcp-socket stream process
+#accepts clients and spawns a new client thread for the video stream
 def socketVideoStream(host, port, processed_frames):
 
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -228,16 +232,16 @@ def detect_video_realtime_mp():
    # Configure depth and color streams
 
     p1 = Process(target=predict_bbox_mp, args=(
-        original_frames, predicted_data))
+        original_frames, predicted_data),daemon=True)
 
     p2 = Process(target=postprocess_mp, args=(
-        boundingBoxes, original_frames, processed_frames))
+        boundingBoxes, original_frames, processed_frames),daemon=True)
 
     p3 = Process(target=Show_Image_mp, args=(
-        processed_frames, original_frames))
+        processed_frames, original_frames),daemon=True)
 
     p4 = Process(target=socketVideoStream, args=(
-        "10.0.0.36", 8080, processed_frames))
+        "10.0.0.36", 8080, processed_frames),daemon=True)
 
     p1.start()
     p2.start()
@@ -255,7 +259,7 @@ def detect_video_realtime_mp():
             if not depth_frame or not color_frame:
                 continue
 
-            violate = set()
+           
 
             color_image = color_frame.get_data()
             color_image = np.asanyarray(color_image)
